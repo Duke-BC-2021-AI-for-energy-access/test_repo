@@ -1,5 +1,6 @@
 import argparse
 import json
+import numpy
 
 from torch.utils.data import DataLoader
 
@@ -79,6 +80,13 @@ def test(cfg,
     p, r, f1, mp, mr, map, mf1, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class = [], [], [], []
+
+    try:
+        f = open('ious.txt', 'r+')
+        f.truncate(0)
+    except:
+        pass
+
     for batch_i, (imgs, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
         imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
         targets = targets.to(device)
@@ -152,6 +160,10 @@ def test(cfg,
                     if pi.shape[0]:
                         # Prediction to target ious
                         ious, i = box_iou(pred[pi, :4], tbox[ti]).max(1)  # best ious, indices
+                        
+                        # Write
+                        with open('ious.txt', 'a') as f:
+                            f.write(str(ious.cpu().numpy()) + '\n')  
 
                         # Append detections
                         for j in (ious > iouv[0]).nonzero():
@@ -221,6 +233,22 @@ def test(cfg,
         except:
             print('WARNING: pycocotools must be installed with numpy==1.17 to run correctly. '
                   'See https://github.com/cocodataset/cocoapi/issues/356')
+
+
+    results_file = 'test_results.txt'
+    # Remove previous results
+    try:
+        f = open(results_file, 'r+')
+        f.truncate(0)
+    except:
+        pass
+
+    # write results
+    with open(results_file, 'w') as f:
+        f.write(str(mp) + '\n')
+        f.write(str(mr) + '\n')
+        f.write(str(map) + '\n')
+        f.write(str(mf1) + '\n')
 
     # Return results
     maps = np.zeros(nc) + map
